@@ -314,4 +314,4 @@ uv run ruff check symproof/
 
 
 
-If you'd like to donate to support this work you can here: https://giveth.io/project/symproof
+If you'd like to donate to support this work you can here: https://giveth.io/project/symproof-by-blockscience-shield3
