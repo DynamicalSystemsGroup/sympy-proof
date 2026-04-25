@@ -173,11 +173,23 @@ Graduated examples in [`examples/`](examples/), each self-contained and runnable
 | [`04_using_the_library.py`](examples/04_using_the_library.py) | Importing pre-built proofs, composition |
 | [`05_control_engineering.py`](examples/05_control_engineering.py) | Plant + controller stability, Lyapunov construction |
 | [`06_latex_export.py`](examples/06_latex_export.py) | LaTeX views of proofs — pipe to file for compilable .tex |
+| [`conviction_voting.ipynb`](examples/conviction_voting.ipynb) / [`.py`](examples/conviction_voting.py) | Storyboard walkthrough: framing axioms, hidden-assumption hunting on a governance system, two failure-and-fix moments |
 
 Run any example:
 
 ```bash
 uv run python examples/01_first_proof.py
+```
+
+### Tutorial notebook
+
+[`examples/conviction_voting.ipynb`](examples/conviction_voting.ipynb) is a guided walkthrough: how to apply symproof to an unfamiliar domain, how `seal()`'s load-bearing checks surface hidden assumptions, and how to recover from proof-construction failures. Read this if "what does symproof feel like in practice?" is your question.
+
+Install notebook deps and open in JupyterLab:
+
+```bash
+uv sync --group notebooks
+uv run jupyter lab examples/conviction_voting.ipynb
 ```
 
 ## Proof Library
