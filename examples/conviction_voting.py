@@ -3,7 +3,7 @@
 
 Reference
 ---------
-1Hive / BlockScience conviction-voting cadCAD model:
+1Hive / DynamicalSystemsGroup conviction-voting cadCAD model:
     https://github.com/1Hive/conviction-voting-cadcad
 
 Source equations (from algorithm_overview.ipynb):
