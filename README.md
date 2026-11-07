@@ -1,8 +1,10 @@
-# symproof
+# sympy-proof
 
-Deterministic proof writing with SymPy.
+Symbolic proof authoring for dynamical system specifications. SymPy-based theorem-style verification of system properties.
 
 Declare axioms, bind hypotheses, build lemma chains, and seal reproducible hashed proof bundles. Every sealed proof gets a deterministic SHA-256 hash — same inputs, same hash, every time.
+
+Maintained by Dynamical Systems Group. Complements [MSML](https://github.com/DynamicalSystemsGroup/MSML) (mathematical specification authoring) and [gds-core](https://github.com/DynamicalSystemsGroup/gds-core) (simulation runtime). Together they form a three-layer V&V stack: specify, simulate, prove.
 
 ## Verification vs. Validation
 
@@ -10,7 +12,7 @@ The most expensive failures in engineering happen when you **correctly implement
 
 - Therac-25: software faithfully executed the control algorithm. The algorithm's concurrency model was flawed. Patients died.
 - Mars Climate Orbiter: code correctly computed trajectory. The specification mixed imperial and metric units. $327M lost.
-- Terra/Luna: code correctly implemented the peg mechanism. The economic model was unstable. $40B lost.
+- Boeing 737 MAX MCAS: the flight control software correctly implemented the specified augmentation law. The specification's reliance on a single sensor was the design flaw. 346 deaths.
 
 Mature fields (aerospace, medical devices, nuclear) solved this decades ago with an explicit split:
 
@@ -21,13 +23,13 @@ Mature fields (aerospace, medical devices, nuclear) solved this decades ago with
 
 Most formal methods tools are **verification** tools — they prove code matches a specification. But if the specification is flawed, correct code still fails.
 
-**symproof is primarily a validation tool.** It works at the formula level, not the code level. "Does this control law actually stabilize the plant?" is a math question. "Does rounding error accumulate in the right direction across a pipeline?" is a math question. "Does this invariant hold under the claimed parameter range?" is a math question. These are questions about whether the *design* is correct — before any code is written.
+**sympy-proof is primarily a validation tool.** It works at the formula level, not the code level. "Does this control law actually stabilize the plant?" is a math question. "Does rounding error accumulate in the right direction across a pipeline?" is a math question. "Does this invariant hold under the claimed parameter range?" is a math question. These are questions about whether the *design* is correct — before any code is written.
 
 ### Why you need all three layers
 
 Each layer of testing has blind spots the others cover. No single layer gives you a complete picture — together they give you a three-dimensional view of system correctness.
 
-**Symbolic analysis** (symproof) surfaces the assumptions your algorithms make about things the code cannot control — user behavior, input distributions, environmental conditions, parameter ranges. These assumptions live in the math, not in the code. A controller that's provably stable for J > 0 will fail if the moment of inertia estimate is wrong. An AMM invariant that holds for 0 < fee < 1 breaks if the fee parameter is set to zero. Code review won't catch this because the code correctly implements the formula. Integration tests might miss it because they test the happy path. Only symbolic analysis forces you to enumerate what you're assuming and check whether those assumptions actually hold.
+**Symbolic analysis** (sympy-proof) surfaces the assumptions your algorithms make about things the code cannot control — user behavior, input distributions, environmental conditions, parameter ranges. These assumptions live in the math, not in the code. A controller that's provably stable for J > 0 will fail if the moment of inertia estimate is wrong. A pricing-curve invariant that holds for 0 < fee < 1 breaks if the fee parameter is set to zero. Code review won't catch this because the code correctly implements the formula. Integration tests might miss it because they test the happy path. Only symbolic analysis forces you to enumerate what you're assuming and check whether those assumptions actually hold.
 
 **Numerical simulation** catches what symbolic analysis can't: finite-precision effects, noise sensitivity, parameter uncertainty, edge cases at domain boundaries. Your formula might be symbolically correct but numerically unstable. Monte Carlo testing reveals the gap between the idealized model and the messy reality.
 
@@ -35,7 +37,7 @@ Each layer of testing has blind spots the others cover. No single layer gives yo
 
 | Layer | Blind spot | What it misses |
 |---|---|---|
-| **Symbolic** (symproof) | Assumes exact arithmetic, idealized conditions | Floating-point errors, noise, real-world parameter variation |
+| **Symbolic** (sympy-proof) | Assumes exact arithmetic, idealized conditions | Floating-point errors, noise, real-world parameter variation |
 | **Simulation** | Tests specific scenarios, not all of them | Edge cases outside the test distribution, systematic design flaws |
 | **Verification** | Proves code matches spec — but the spec might be wrong | Mathematical errors in the design, wrong assumptions about the environment |
 
@@ -45,17 +47,29 @@ Each layer is necessary. None is sufficient. The expensive failures happen in th
 
 | Layer | Role | Proves | Tool |
 |---|---|---|---|
-| **Validation** (symproof) | Is the math right? | Formulas have the behavioral properties designers expect | SymPy + deterministic hashing |
+| **Validation** (sympy-proof) | Is the math right? | Formulas have the behavioral properties designers expect | SymPy + deterministic hashing |
 | **Simulation** | Does it work in practice? | Properties hold under finite precision, noise, parameter variation | numpy, MATLAB, Monte Carlo, fuzzing |
 | **Verification** | Is the code right? | Production code matches the validated model | Static analysis, formal verification, code review |
 
-symproof covers the first layer. It proves that the *formula* has the properties you think it has — not that the *code* implements the formula correctly, and not that the formula behaves well under conditions you haven't modeled. Crucially, it makes the assumptions explicit: every axiom in a proof bundle is a condition the design depends on. If those conditions don't hold in deployment, the proof is still valid — but the system will still fail.
+sympy-proof covers the first layer. It proves that the *formula* has the properties you think it has — not that the *code* implements the formula correctly, and not that the formula behaves well under conditions you haven't modeled. Crucially, it makes the assumptions explicit: every axiom in a proof bundle is a condition the design depends on. If those conditions don't hold in deployment, the proof is still valid — but the system will still fail.
 
 The innovation is **binding all three layers via cryptographically traceable evidence trees.** Each sealed proof bundle gets a deterministic SHA-256 hash. That hash goes into a requirements traceability matrix alongside simulation results and code audit findings. Any reviewer can re-run the proof and get the identical hash — independent, reproducible evidence.
 
+```mermaid
+flowchart TD
+    Spec[Design / Specification]
+    Spec --> V[sympy-proof: symbolic validation<br/>SymPy + deterministic hashing]
+    Spec --> S[Simulation<br/>numpy / MATLAB / Monte Carlo / fuzzing]
+    Spec --> C[Code verification<br/>static analysis / formal methods / review]
+    V -->|proof bundle SHA-256| RTM[Requirements Traceability Matrix]
+    S -->|simulation result hash| RTM
+    C -->|audit findings hash| RTM
+    RTM --> Cred[Engineering credibility:<br/>independent, reproducible, auditable]
+```
+
 The [satellite ADCS example](symproof/library/examples/control/04_composition.py) demonstrates the full pattern: three independent proofs (controllability, observability, Lyapunov stability) composed into a single sealed bundle, with an explicit hash mapped to a stability requirement in the V&V matrix.
 
-### What symproof proves (validation)
+### What sympy-proof proves (validation)
 
 - A Lyapunov function exists (the model is actually stable — under the stated assumptions)
 - The characteristic polynomial is Hurwitz (all roots in the left half-plane)
@@ -64,9 +78,9 @@ The [satellite ADCS example](symproof/library/examples/control/04_composition.py
 - A boolean circuit's output entropy quantifies information leakage
 - An LP solution satisfies optimality conditions (KKT / duality)
 - A continuous function on a compact set attains its maximum (EVT)
-- An economic invariant holds under the claimed fee structure
+- A market-mechanism invariant holds under the claimed fee structure
 
-### What symproof does NOT prove
+### What sympy-proof does NOT prove
 
 - Production code matches the proven formula → **verification** (formal verification, code review)
 - The formula behaves under parameter uncertainty → **simulation** (Monte Carlo, fuzzing)
@@ -74,7 +88,7 @@ The [satellite ADCS example](symproof/library/examples/control/04_composition.py
 - Runtime inputs stay within the proven bounds → **monitoring** (runtime checks, assertions)
 - The axioms actually hold in deployment → **domain expertise** (the proof is only as good as its assumptions)
 
-These gaps are covered by the other layers. symproof's proofs are **necessary but not sufficient** — they establish that the design is mathematically sound and its assumptions are explicit, before simulation tests it under stress and code analysis verifies the implementation.
+These gaps are covered by the other layers. sympy-proof's proofs are **necessary but not sufficient** — they establish that the design is mathematically sound and its assumptions are explicit, before simulation tests it under stress and code analysis verifies the implementation.
 
 ### Hidden axioms: the silent failure mode
 
@@ -86,7 +100,7 @@ This is the **hidden axiom problem**: when you invoke a result, you inherit all 
 
 Hidden axioms are a major source of failures in practice, especially among scientists and engineers who cite theorems without carefully interrogating their implicit conditions — or at minimum, confirming that those conditions are appropriate simplifications for their application. The theorem is correct. The axioms hold in the abstract. But the specific system violates a condition that was never checked because it was never surfaced.
 
-symproof addresses this with **foundation enforcement**: when a proof depends on an external theorem, `seal()` requires a foundation bundle that makes the theorem's assumptions explicit. Every assumption in the foundation must appear in the downstream proof's axiom set — either as a posited axiom (a modelling choice) or as an inherited axiom (a condition the proof chain forced). Missing assumptions are flagged as hidden axioms and `seal()` refuses to proceed.
+sympy-proof addresses this with **foundation enforcement**: when a proof depends on an external theorem, `seal()` requires a foundation bundle that makes the theorem's assumptions explicit. Every assumption in the foundation must appear in the downstream proof's axiom set — either as a posited axiom (a modelling choice) or as an inherited axiom (a condition the proof chain forced). Missing assumptions are flagged as hidden axioms and `seal()` refuses to proceed.
 
 ```python
 # This fails — foundation has axioms not declared in downstream
@@ -110,9 +124,9 @@ See the [DIP routing demonstration](symproof/library/examples/dip_routing/) for 
 
 ### Why this matters
 
-An engineer designs a controller. A programmer implements it. But nobody proves the engineer's math actually has the stability properties the design review claims. A protocol economist writes a market mechanism. An auditor verifies the code. But nobody proves the economist's formulas actually preserve the invariants under adversarial conditions.
+An engineer designs a controller. A programmer implements it. But nobody proves the engineer's math actually has the stability properties the design review claims. A protocol designer writes a mechanism. An auditor verifies the code. But nobody proves the designer's formulas actually preserve the invariants under adversarial conditions.
 
-This is the gap where the most expensive failures live — and it's the gap symproof fills.
+This is the gap where the most expensive failures live — and it's the gap sympy-proof fills.
 
 The goal: an open-source verification and validation stack where symbolic proofs, simulation results, and code audit findings are all independently reproducible, cryptographically linked, and traceable to requirements.
 
@@ -161,6 +175,28 @@ bundle = seal(axioms, h, script)
 print(bundle.bundle_hash)  # deterministic 64-char SHA-256
 ```
 
+What `seal()` actually produces:
+
+```mermaid
+flowchart TD
+    AS["AxiomSet<br/>posited axioms + inherited axioms + external citations"]
+    H["Hypothesis<br/>(carries axiom_set_hash)"]
+    PS["ProofScript<br/>chain of Lemmas, each typed by LemmaKind:<br/>EQUALITY / BOOLEAN / QUERY / PROPERTY / INFERENCE / COORDINATE_TRANSFORM"]
+    F["Optional: Foundations<br/>cited external bundles<br/>(their axioms must be covered by AS)"]
+    AS --> Checks{seal checks}
+    H --> Checks
+    PS --> Checks
+    F -.-> Checks
+    Checks -->|all guards pass| B["ProofBundle<br/>bundle_hash: SHA-256<br/>advisories: full assumption set"]
+    Checks -->|guards fail| Err[ValueError:<br/>hidden axiom / falsity /<br/>load-bearing assumption / inconsistency]
+```
+
+The guards (`seal()` rejects if any fail):
+- **Foundation coverage** — every axiom of every cited foundation appears in the downstream `AxiomSet` (as posited or inherited)
+- **Falsity check** — no axiom whose `simplify(expr)` is `False`
+- **Pairwise consistency** — no axiom pair whose conjunction simplifies to `False`
+- **Load-bearing accounting** — symbol-level assumptions (`positive=True`, etc.) that affect verification must appear as named axioms
+
 ## Examples
 
 Graduated examples in [`examples/`](examples/), each self-contained and runnable:
@@ -173,7 +209,7 @@ Graduated examples in [`examples/`](examples/), each self-contained and runnable
 | [`04_using_the_library.py`](examples/04_using_the_library.py) | Importing pre-built proofs, composition |
 | [`05_control_engineering.py`](examples/05_control_engineering.py) | Plant + controller stability, Lyapunov construction |
 | [`06_latex_export.py`](examples/06_latex_export.py) | LaTeX views of proofs — pipe to file for compilable .tex |
-| [`conviction_voting.ipynb`](examples/conviction_voting.ipynb) / [`.py`](examples/conviction_voting.py) | Storyboard walkthrough: framing axioms, hidden-assumption hunting on a governance system, two failure-and-fix moments |
+| [`conviction_voting.ipynb`](examples/conviction_voting.ipynb) / [`.py`](examples/conviction_voting.py) | Storyboard walkthrough on a continuous-aggregation governance mechanism: framing axioms, hidden-assumption hunting, two failure-and-fix moments |
 
 Run any example:
 
@@ -183,7 +219,7 @@ uv run python examples/01_first_proof.py
 
 ### Tutorial notebook
 
-[`examples/conviction_voting.ipynb`](examples/conviction_voting.ipynb) is a guided walkthrough: how to apply symproof to an unfamiliar domain, how `seal()`'s load-bearing checks surface hidden assumptions, and how to recover from proof-construction failures. Read this if "what does symproof feel like in practice?" is your question.
+[`examples/conviction_voting.ipynb`](examples/conviction_voting.ipynb) is a guided walkthrough: how to apply sympy-proof to an unfamiliar domain, how `seal()`'s load-bearing checks surface hidden assumptions, and how to recover from proof-construction failures. Read this if "what does sympy-proof feel like in practice?" is your question.
 
 Install notebook deps and open in JupyterLab:
 
@@ -223,9 +259,9 @@ Pre-built, reusable proof bundles organized by domain. Import them into your pro
 | `observability_rank(ax, A, C)` | System (A,C) is observable |
 | `quadratic_invariant(ax, states, dots, V)` | dV/dt = 0 along trajectories |
 
-### DeFi (`symproof.library.defi`)
+### Fixed-Point Numerics (`symproof.library.defi`)
 
-Tools for the numerical analysis issues Solidity auditors actually face.
+Fixed-point arithmetic primitives with explicit rounding direction. Useful for any setting where finite-precision rounding behavior matters — smart-contract audits, embedded systems, monetary calculations, signal-processing pipelines.
 
 | Function / Class | Proves |
 |------------------|--------|
@@ -238,7 +274,7 @@ Tools for the numerical analysis issues Solidity auditors actually face.
 | `no_phantom_overflow_check(a, b)` | a*b fits in uint256 (naive path safe) |
 | `DecimalAwarePool(rx, ry, dec_x, dec_y)` | Cross-decimal normalization (e.g., USDC/6 ↔ WETH/18) |
 | `fee_complement_positive(ax, fee)` | 1 - fee > 0 from 0 < fee < 1 |
-| `amm_output_positive(ax, Rx, Ry, fee, dx)` | AMM swap output > 0 |
+| `amm_output_positive(ax, Rx, Ry, fee, dx)` | Constant-product market output > 0 |
 | `amm_product_nondecreasing(ax, Rx, Ry, fee, dx)` | Product invariant grows with fees |
 
 Run the walkthrough: `uv run python -m symproof.library.examples.defi.01_amm_swap_audit`
@@ -305,7 +341,7 @@ Run the walkthrough: `uv run python -m symproof.library.examples.defi.01_amm_swa
 
 ## Verification Strategies
 
-symproof dispatches on `LemmaKind`:
+sympy-proof dispatches on `LemmaKind`:
 
 | Kind | How it verifies | Use when |
 |------|----------------|----------|
@@ -324,6 +360,26 @@ uv run python -m pytest tests/ -v
 uv run ruff check symproof/
 ```
 
+## Engineering principles encoded in this tool
 
+Five commitments shape sympy-proof's design. They are distilled from observing how high-consequence systems actually fail in industrial practice, and they generalize beyond formal-methods tooling to any V&V practice that aspires to engineered accountability.
 
-If you'd like to donate to support this work you can here: https://giveth.io/project/symproof-by-blockscience-shield3
+**Validation precedes verification.** The most expensive engineering failures happen not when code mismatches its specification, but when the specification itself is wrong. Most formal-methods tooling addresses the former. sympy-proof addresses the latter. Verification operates on the code after it is written; validation operates on the math before any code exists. A practice that emphasizes only verification will reliably ship correct implementations of flawed designs — exactly the failure mode that characterizes Therac-25, the Mars Climate Orbiter loss, and the Boeing 737 MAX MCAS incidents. sympy-proof's foundational design choice is to make validation the explicit, separately-tooled layer that those failure modes demand.
+
+**Assumptions must be explicit to be auditable.** Every proof holds under a set of conditions. When those conditions are unstated, downstream readers cannot tell whether the proof's conclusions apply to their setting. The `Axiom` type makes assumptions structural: every assumption is named, typed, and tracked. The `inherited=True` flag distinguishes assumptions the proof author chose (modelling commitments) from assumptions the proof chain forced (preconditions of cited results) — both are required for soundness, but they have different review implications. The design conviction: an unaudited assumption is a soundness gap that no amount of algebraic verification will catch.
+
+**Hidden axioms are the dominant failure mode in practice.** The recurring failure pattern in engineering papers and industrial proofs is not algebraic error — it is citing a theorem without confirming its preconditions in the new setting. A controls engineer applies a stability result that requires Lipschitz continuity to a system with saturation discontinuities. A financial engineer invokes a convergence theorem requiring bounded stochastic gradients on a model with heavy-tailed noise. Both citations are correct in the abstract and wrong in the application. The `foundations=[...]` mechanism in `seal()` enforces that every assumption of every cited theorem is explicitly inherited or re-justified, making this class of failure surface at proof-construction time rather than at deployment.
+
+**Accountability is structural, not reputational.** Every sealed proof carries a deterministic SHA-256 hash. Two independent reviewers running the same proof under the same axiom set produce the same hash. That hash goes into a requirements traceability matrix alongside simulation evidence and code-audit evidence. Accountability is then *locatable*: a specific hash, traceable to specific axioms, traceable to specific human approvers. This is meaningfully different from "the team reviewed the proof." The structural form makes the accountability chain auditable by anyone — including the team's future selves at the moment of an incident review.
+
+**Three layers of evidence are necessary; none alone is sufficient.** Symbolic proofs, numerical simulation, and code-level verification each catch failure modes the others miss. Symbolic analysis assumes exact arithmetic and idealized conditions — misses floating-point error, noise, parameter variation. Simulation tests specific scenarios — misses systematic design flaws outside the test distribution. Code verification proves code matches spec — misses errors in the spec itself. Each layer is necessary; none alone is sufficient. The cryptographically-traceable evidence chain that *links* the three layers is what produces engineering credibility, not any single layer's strength taken in isolation.
+
+These design commitments reflect DSG's broader posture on V&V for high-consequence systems: a preference for restraint-first, audit-first tooling that surfaces uncertainty rather than concealing it, and that makes the chain of human accountability visible at the structural level rather than relying on institutional trust.
+
+## Related work at DSG
+
+sympy-proof sits at the validation layer of a three-layer V&V stack maintained by Dynamical Systems Group:
+
+- [MSML](https://github.com/DynamicalSystemsGroup/MSML) — Mathematical Specification Modeling Language. Authoring environment for the formulas sympy-proof verifies.
+- [gds-core](https://github.com/DynamicalSystemsGroup/gds-core) — Generalized Dynamical Systems simulation runtime. Numerical-simulation layer; consumes the same models sympy-proof proves properties about.
+- [dynamical-block-diagrams](https://github.com/DynamicalSystemsGroup/dynamical-block-diagrams) — Diagrammatic notation for dynamical systems; supports both specification and exposition.
